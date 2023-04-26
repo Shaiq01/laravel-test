@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
 use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\DB;
 
 class MenuController extends BaseController
 {
@@ -93,6 +94,32 @@ class MenuController extends BaseController
      */
 
     public function getMenuItems() {
-        throw new \Exception('implement in coding task 3');
+        $menuItems = DB::select("
+            SELECT *, NULL AS children
+            FROM menu_items
+            WHERE parent_id IS NULL
+            UNION
+            SELECT mi.*, NULL AS children
+            FROM menu_items mi
+            JOIN (
+                SELECT DISTINCT parent_id
+                FROM menu_items
+                WHERE parent_id IS NOT NULL
+            ) AS mip ON mi.id = mip.parent_id
+            ORDER BY parent_id NULLS FIRST, id
+        ");
+
+        $menuItems = collect($menuItems);
+        $menuItemsById = $menuItems->keyBy('id');
+
+        $menuItems->each(function ($menuItem) use ($menuItemsById) {
+            if ($menuItem->parent_id !== null) {
+                $menuItemsById[$menuItem->parent_id]->children[] = $menuItem;
+            }
+        });
+        
+        return $menuItems->filter(function ($menuItem) {
+            return $menuItem->parent_id === null;
+        });
     }
 }
